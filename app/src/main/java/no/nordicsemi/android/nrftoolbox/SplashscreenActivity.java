@@ -30,6 +30,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Parcelable;
 
+import no.nordicsemi.android.nrftoolbox.proximity.ProximityActivity;
+
 public class SplashscreenActivity extends Activity {
 	/** Splash screen duration time in milliseconds */
 	private static final int DELAY = 1000;
@@ -41,7 +43,7 @@ public class SplashscreenActivity extends Activity {
 
 		// Jump to SensorsActivity after DELAY milliseconds 
 		new Handler().postDelayed(() -> {
-			final Intent newIntent = new Intent(SplashscreenActivity.this, FeaturesActivity.class);
+			final Intent newIntent = new Intent(SplashscreenActivity.this, ProximityActivity.class);
 			newIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
 
 			// Handle NFC message, if app was opened using NFC AAR record

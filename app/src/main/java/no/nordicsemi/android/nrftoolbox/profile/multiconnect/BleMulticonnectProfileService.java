@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import no.nordicsemi.android.ble.BleManager;
 import no.nordicsemi.android.ble.BleManagerCallbacks;
@@ -57,6 +58,7 @@ public abstract class BleMulticonnectProfileService extends Service implements B
 	public static final String BROADCAST_BOND_STATE = "no.nordicsemi.android.nrftoolbox.BROADCAST_BOND_STATE";
 	public static final String BROADCAST_BATTERY_LEVEL = "no.nordicsemi.android.nrftoolbox.BROADCAST_BATTERY_LEVEL";
 	public static final String BROADCAST_ERROR = "no.nordicsemi.android.nrftoolbox.BROADCAST_ERROR";
+	private static final String LOCK_LIST_PREF = "SECUYOU_BONDED_LOCKS_LIST";
 
 	public static final String EXTRA_DEVICE = "no.nordicsemi.android.nrftoolbox.EXTRA_DEVICE";
 	public static final String EXTRA_CONNECTION_STATE = "no.nordicsemi.android.nrftoolbox.EXTRA_CONNECTION_STATE";
@@ -134,6 +136,8 @@ public abstract class BleMulticonnectProfileService extends Service implements B
 				return;
 			mManagedDevices.add(device);
 
+			getSharedPreferences(LOCK_LIST_PREF, 0).edit().putString(device.getAddress(), device.getName()).apply();
+
 			BleManager<BleManagerCallbacks> manager = mBleManagers.get(device);
 			if (manager != null) {
 				if (session != null)
@@ -159,6 +163,8 @@ public abstract class BleMulticonnectProfileService extends Service implements B
 				manager.disconnect();
 			}
 			mManagedDevices.remove(device);
+
+			getSharedPreferences(LOCK_LIST_PREF, 0).edit().remove(device.getAddress()).apply();
 		}
 
 		/**
@@ -326,6 +332,13 @@ public abstract class BleMulticonnectProfileService extends Service implements B
 		final BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 		if (bluetoothAdapter.isEnabled()) {
 			onBluetoothEnabled();
+		}
+
+		Map map = getSharedPreferences(LOCK_LIST_PREF, 0).getAll();
+		for (BluetoothDevice bl : BluetoothAdapter.getDefaultAdapter().getBondedDevices()) {
+			if (map.containsKey(bl.getAddress())) {
+				getBinder().connect(bl, null);
+			}
 		}
 	}
 

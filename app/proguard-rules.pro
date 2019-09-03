@@ -1,4 +1,3 @@
--libraryjars ../app/libs
 -optimizationpasses 5
 -dontusemixedcaseclassnames
 -dontskipnonpubliclibraryclasses
@@ -100,3 +99,9 @@
 # DFU Library
 -keep class no.nordicsemi.android.dfu.** { *; }
 
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn javax.annotation.**
+-dontwarn org.conscrypt.**
+# A resource is loaded with a relative path so the package of this class must be preserved.
+-keepnames class okhttp3.internal.publicsuffix.PublicSuffixDatabase

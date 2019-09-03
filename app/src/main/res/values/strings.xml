@@ -22,7 +22,7 @@
   -->
 <resources>
 
-	<string name="app_name">nRF Toolbox</string>
+	<string name="app_name">Remote lock</string>
 	<string name="font_path">fonts/trebucbd.ttf</string>
 	<string name="normal_font_path">fonts/trebuc.ttf</string>
 

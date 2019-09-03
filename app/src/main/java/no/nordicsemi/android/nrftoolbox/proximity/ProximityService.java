@@ -22,6 +22,7 @@
 package no.nordicsemi.android.nrftoolbox.proximity;
 
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
@@ -30,10 +31,12 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Color;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
+import android.os.Build;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationManagerCompat;
 import android.support.v4.content.ContextCompat;
@@ -50,6 +53,7 @@ import no.nordicsemi.android.nrftoolbox.FeaturesActivity;
 import no.nordicsemi.android.nrftoolbox.R;
 import no.nordicsemi.android.nrftoolbox.ToolboxApplication;
 import no.nordicsemi.android.nrftoolbox.profile.multiconnect.BleMulticonnectProfileService;
+import no.nordicsemi.android.nrftoolbox.utility.DebugLogger;
 
 public class ProximityService extends BleMulticonnectProfileService implements ProximityManagerCallbacks, ProximityServerManagerCallbacks {
 	@SuppressWarnings("unused")
@@ -79,6 +83,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 
 	private int mAttempt;
 	private final static int MAX_ATTEMPTS = 1;
+	private HttpTools httpTools;
 
 	/**
 	 * This local binder is an interface for the bonded activity to operate with the proximity sensor
@@ -92,6 +97,12 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 		public boolean toggleImmediateAlert(final BluetoothDevice device) {
 			final ProximityManager manager = (ProximityManager) getBleManager(device);
 			return manager.toggleImmediateAlert();
+		}
+
+		public void toggleLock(BluetoothDevice device, boolean locked) {
+			DebugLogger.d(TAG, "Toggle lock. Set locked: "+locked);
+			final ProximityManager manager = (ProximityManager) getBleManager(device);
+			manager.writeImmediateAlert(locked);
 		}
 
 		/**
@@ -113,7 +124,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 
 	@Override
 	protected BleManager<ProximityManagerCallbacks> initializeManager() {
-		return new ProximityManager(this);
+		return new ProximityManager(this, httpTools);
 	}
 
 	/**
@@ -150,6 +161,11 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 
 	@Override
 	protected void onServiceCreated() {
+		Intent notificationIntent = new Intent(this, ProximityActivity.class);
+		PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+
+		startForeground();
+
 		mServerManager = new ProximityServerManager(this);
 		mServerManager.setLogger(mBinder);
 
@@ -160,6 +176,30 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 		filter.addAction(ACTION_FIND);
 		filter.addAction(ACTION_SILENT);
 		registerReceiver(mToggleAlarmActionBroadcastReceiver, filter);
+
+		httpTools = new HttpTools(mBinder);
+		httpTools.initSocketListener();
+	}
+
+	private void startForeground(){
+		String NOTIFICATION_CHANNEL_ID = "no.joymyr.remotelock";
+		String channelName = "Remotelock listener service";
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			NotificationChannel chan = new NotificationChannel(NOTIFICATION_CHANNEL_ID, channelName, NotificationManager.IMPORTANCE_NONE);
+			chan.setLightColor(Color.BLUE);
+			chan.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
+			NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+			assert manager != null;
+			manager.createNotificationChannel(chan);
+		}
+		NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID);
+		Notification notification = notificationBuilder.setOngoing(true)
+				.setSmallIcon(R.drawable.ic_lock_open_black_24dp)
+				.setContentTitle("Remotelock is listening for events")
+				.setPriority(NotificationManager.IMPORTANCE_MIN)
+				.setCategory(Notification.CATEGORY_SERVICE)
+				.build();
+		startForeground(2, notification);
 	}
 
 	@Override
@@ -238,6 +278,13 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 	}
 
 	@Override
+	public void onError(BluetoothDevice device, String message, int errorCode) {
+		super.onError(device, message, errorCode);
+		httpTools.pushLockState("Error code "+errorCode+" occured: "+message);
+		Log.d(TAG, "Error code "+errorCode+" occured: "+message);
+	}
+
+	@Override
 	public void onServicesDiscovered(final BluetoothDevice device, final boolean optionalServicesFound) {
 		super.onServicesDiscovered(device, optionalServicesFound);
 		mServerManager.openConnection(device);
@@ -272,7 +319,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 
 	@Override
 	public void onAlarmTriggered(final BluetoothDevice device) {
-		playAlarm(device);
+//		playAlarm(device);
 	}
 
 	@Override
@@ -389,9 +436,9 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 		builder.setColor(ContextCompat.getColor(this, R.color.orange));
 
 		final Uri notificationUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-		builder.setSound(notificationUri, AudioManager.STREAM_ALARM); // make sure the sound is played even in DND mode
+		//builder.setSound(notificationUri, AudioManager.STREAM_ALARM); // make sure the sound is played even in DND mode
 		builder.setPriority(NotificationCompat.PRIORITY_HIGH);
-		builder.setCategory(NotificationCompat.CATEGORY_ALARM);
+		builder.setCategory(NotificationCompat.CATEGORY_ERROR);
 		builder.setShowWhen(true).setOngoing(false); // an ongoing notification would not be shown on Android Wear
 		// This notification is to be shown not in a group
 

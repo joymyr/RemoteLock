@@ -1,13 +1,14 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android-extensions'
+apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 27
-    buildToolsVersion "27.0.3"
+    compileSdkVersion 28
 
     defaultConfig {
-        applicationId "no.nordicsemi.android.nrftoolbox"
-        minSdkVersion 18
-        targetSdkVersion 27
+        applicationId "no.joymyr.remotelock"
+        minSdkVersion 23
+        targetSdkVersion 28
         versionCode 66
         versionName "2.6.0"
         resConfigs "en"
@@ -32,37 +33,44 @@ android {
 
 dependencies {
     implementation project(':common')
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
-    wearApp project(path: ':wear')
-
-    // nRF Toolbox is using Play Service 10.2.0 in order to make the app working in China:
-    // https://developer.android.com/training/wearables/apps/creating-app-china.html
     //noinspection GradleDependency
-    implementation 'com.google.android.gms:play-services-wearable:10.2.0'
-
+    implementation 'com.android.support:appcompat-v7:28.0.0'
     //noinspection GradleDependency
-    implementation 'com.android.support:appcompat-v7:27.1.1'
-    //noinspection GradleDependency
-    implementation 'com.android.support:design:27.1.1'
-
+    implementation 'com.android.support:design:28.0.0'
     implementation 'no.nordicsemi.android:log:2.1.1'
     implementation 'no.nordicsemi.android.support.v18:scanner:1.1.0'
-
     // The DFU Library is imported automatically from jcenter:
     implementation 'no.nordicsemi.android:dfu:1.6.1'
     // if you desire to build the DFU Library, clone the https://github.com/NordicSemiconductor/Android-DFU-Library project into DFULibrary folder,
     // add it as a module into the project structure and uncomment the following line (and also the according lines in the settings.gradle):
     // implementation project(':dfu')
-
     // Import the BLE Library
     implementation 'no.nordicsemi.android:ble:1.2.0'
     // The BLE Library may be included from jcenter. If you want to modify the code,
     // clone the project from GitHub and replace the line above with the following
     // (and also the according lines in the settings.gradle):
     // implementation project(':ble')
-
+    implementation 'com.squareup.okhttp3:okhttp:3.11.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:3.11.0'
     implementation('org.simpleframework:simple-xml:2.7.1') {
         exclude group: 'stax', module: 'stax-api'
         exclude group: 'xpp3', module: 'xpp3'
     }
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.0.1'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+}
+// temporary workaround for support library version mismatch
+configurations.all {
+    resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+        def requested = details.requested
+        if (requested.group == 'com.android.support') {
+            if (!requested.name.startsWith("multidex")) {
+                details.useVersion '28.0.0'
+            }
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
 }

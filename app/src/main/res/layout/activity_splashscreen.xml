@@ -26,18 +26,17 @@
 	tools:context=".SplashscreenActivity">
 
 	<ImageView
-		android:layout_width="wrap_content"
-		android:layout_height="wrap_content"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
 		android:layout_gravity="center"
-		android:layout_marginBottom="70dp"
-		android:scaleType="center"
-		android:src="@drawable/nordic_logo"/>
+		android:scaleType="fitCenter"
+		android:src="@drawable/ic_launcher_foreground"/>
 
 	<ImageView
-		android:layout_width="wrap_content"
-		android:layout_height="wrap_content"
-		android:layout_gravity="bottom|center"
-		android:layout_marginBottom="6dp"
-		android:src="@drawable/background_title"/>
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:layout_gravity="center"
+		android:scaleType="fitCenter"
+		android:src="@drawable/ic_launcher_background"/>
 
 </merge>

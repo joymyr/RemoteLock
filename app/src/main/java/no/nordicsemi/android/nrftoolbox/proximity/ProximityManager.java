@@ -23,9 +23,9 @@ package no.nordicsemi.android.nrftoolbox.proximity;
 
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.content.Context;
-
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.UUID;
@@ -35,6 +35,7 @@ import no.nordicsemi.android.ble.Request;
 import no.nordicsemi.android.log.Logger;
 import no.nordicsemi.android.nrftoolbox.parser.AlertLevelParser;
 import no.nordicsemi.android.nrftoolbox.utility.DebugLogger;
+import no.nordicsemi.android.nrftoolbox.utility.ParserUtils;
 
 public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 	private final String TAG = "ProximityManager";
@@ -46,15 +47,28 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 	/** Alert Level characteristic UUID */
 	private static final UUID ALERT_LEVEL_CHARACTERISTIC_UUID = UUID.fromString("00002A06-0000-1000-8000-00805f9b34fb");
 
+	private static final UUID CLIENT_CHARACTERISTIC_CONFIG_DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+
+	private static final UUID BATTERY_LEVEL_CHARACTERISTIC = UUID.fromString("00002A19-0000-1000-8000-00805f9b34fb");
+	private static final UUID LOCK_CHARACTERISTIC = UUID.fromString("B1DE1524-85EF-37CC-00C8-A3CF3412A548");
+	private static final UUID LOCK_CMD_CHARACTERISTIC = UUID.fromString("B1DE1525-85EF-37CC-00C8-A3CF3412A548");
+	private static final UUID LOCK_NAME_CHARACTERISTIC = UUID.fromString("B1DE1526-85EF-37CC-00C8-A3CF3412A548");
+	public static final UUID LOCK_SERVICE = UUID.fromString("B1DE1523-85EF-37CC-00C8-A3CF3412A548");
+
+	private static final byte[] UNLOCK = BleLockCommandBuilder.buildCommand(BleLockCommandBuilder.BLE_LOCK_CMD.CMD_PARAM_DRIVE_LOCK_TO_UNLOCKED);
+	private static final byte[] LOCK = BleLockCommandBuilder.buildCommand(BleLockCommandBuilder.BLE_LOCK_CMD.CMD_PARAM_DRIVE_LOCK_TO_LOCKED);
+
 	private final static byte[] HIGH_ALERT = { 0x02 };
 	private final static byte[] MILD_ALERT = { 0x01 };
 	private final static byte[] NO_ALERT = { 0x00 };
+	private final HttpTools httpTools;
 
 	private BluetoothGattCharacteristic mAlertLevelCharacteristic, mLinklossCharacteristic;
 	private boolean mAlertOn;
 
-	public ProximityManager(final Context context) {
+	public ProximityManager(final Context context, HttpTools httpTools) {
 		super(context);
+		this.httpTools = httpTools;
 	}
 
 	@Override
@@ -76,14 +90,42 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 		protected Deque<Request> initGatt(final BluetoothGatt gatt) {
 			final LinkedList<Request> requests = new LinkedList<>();
 			requests.add(Request.newWriteRequest(mLinklossCharacteristic, HIGH_ALERT));
+			internalSetLockstatusNotifications(gatt, true);
 			return requests;
+		}
+
+		private boolean internalSetLockstatusNotifications(BluetoothGatt gatt, boolean enable) {
+			if (gatt == null) {
+				return false;
+			}
+			BluetoothGattService LockService = gatt.getService(LOCK_SERVICE);
+			if (LockService == null) {
+				return false;
+			}
+			BluetoothGattCharacteristic LockCharacteristic = LockService.getCharacteristic(LOCK_CHARACTERISTIC);
+			if (LockCharacteristic == null || (LockCharacteristic.getProperties() & 16) == 0) {
+				return false;
+			}
+			gatt.setCharacteristicNotification(LockCharacteristic, enable);
+			BluetoothGattDescriptor descriptor = LockCharacteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG_DESCRIPTOR_UUID);
+			if (descriptor == null) {
+				return false;
+			}
+			if (enable) {
+				descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+			} else {
+				descriptor.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+			}
+			return gatt.writeDescriptor(descriptor);
 		}
 
 		@Override
 		protected boolean isRequiredServiceSupported(final BluetoothGatt gatt) {
-			final BluetoothGattService llService = gatt.getService(LINKLOSS_SERVICE_UUID);
+			final BluetoothGattService llService = gatt.getService(ProximityManager.LOCK_SERVICE);
 			if (llService != null) {
-				mLinklossCharacteristic = llService.getCharacteristic(ALERT_LEVEL_CHARACTERISTIC_UUID);
+				mLinklossCharacteristic = llService.getCharacteristic(ProximityManager.LOCK_CHARACTERISTIC);
+				ProximityManager.this.mLockCharacteristic = llService.getCharacteristic(ProximityManager.LOCK_CHARACTERISTIC);
+				ProximityManager.this.mLockCMDCharacteristic = llService.getCharacteristic(ProximityManager.LOCK_CMD_CHARACTERISTIC);
 			}
 			return mLinklossCharacteristic != null;
 		}
@@ -109,7 +151,60 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 		protected void onCharacteristicWrite(final BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
 			Logger.a(mLogSession, "\"" + AlertLevelParser.parse(characteristic) + "\" sent");
 		}
+
+		@Override
+		protected void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+			super.onCharacteristicRead(gatt, characteristic);
+			onCharacteristicIndicated(gatt, characteristic);
+		}
+
+		@Override
+		protected void onCharacteristicNotified(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+			super.onCharacteristicNotified(gatt, characteristic);
+			onCharacteristicIndicated(gatt, characteristic);
+		}
+
+		@Override
+		protected void onCharacteristicIndicated(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+			super.onCharacteristicIndicated(gatt, characteristic);
+			String data = ParserUtils.parse(characteristic);
+			if (isLockstatusCharacteristic(characteristic)) {
+				Logger.a(mLogSession, "Notification received from " + characteristic.getUuid() + ", value: " + data);
+				byte[] lockstatusValue = characteristic.getValue();
+				Logger.a(mLogSession, "Lockstatus received: " + lockstatusValue + "%");
+
+				if (BleLockCodes.isNewLockState(lockstatusValue)) {
+					boolean locked = BleLockCodes.isDoorLocked(lockstatusValue);
+					httpTools.pushLockState("Lock "+gatt.getDevice().getName().trim()+" is "+(locked ? "Locked" : "Unlocked"));
+				} else if (BleLockCodes.isFailedLockState(lockstatusValue)) {
+					httpTools.pushLockState(gatt.getDevice().getName().trim()+" failed to lock");
+				}
+			} else if (isBatteryLevelCharacteristic(characteristic)) {
+				Logger.a(mLogSession, "Notification received from " + characteristic.getUuid() + ", value: " + data);
+				int batteryValue = characteristic.getIntValue(17, 0);
+				Logger.a(mLogSession, "Battery level received: " + batteryValue + "%");
+				httpTools.pushLockState("Battery level of "+gatt.getDevice().getName()+" is "+batteryValue);
+			}
+		}
 	};
+
+	private boolean mLOCKED;
+	private BluetoothGattCharacteristic mLockCMDCharacteristic;
+	private BluetoothGattCharacteristic mLockCharacteristic;
+
+	private boolean isBatteryLevelCharacteristic(BluetoothGattCharacteristic characteristic) {
+		if (characteristic == null) {
+			return false;
+		}
+		return BATTERY_LEVEL_CHARACTERISTIC.equals(characteristic.getUuid());
+	}
+
+	private boolean isLockstatusCharacteristic(BluetoothGattCharacteristic characteristic) {
+		if (characteristic == null) {
+			return false;
+		}
+		return LOCK_CHARACTERISTIC.equals(characteristic.getUuid());
+	}
 
 	/**
 	 * Toggles the immediate alert on the target device.
@@ -125,15 +220,21 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 	 * @param on true to enable the alarm on proximity tag, false to disable it
 	 */
 	public void writeImmediateAlert(final boolean on) {
-		if (!isConnected())
+		if (!isConnected()) {
+			httpTools.pushLockState("Lock "+mBluetoothDevice.getName().trim()+" is not connected");
 			return;
-
-		if (mAlertLevelCharacteristic != null) {
-			writeCharacteristic(mAlertLevelCharacteristic, on ? HIGH_ALERT : NO_ALERT);
-			mAlertOn = on;
-		} else {
-			DebugLogger.w(TAG, "Immediate Alert Level Characteristic is not found");
 		}
+
+		byte[] byteCmd = on ? LOCK : UNLOCK;
+
+		if (this.mLockCMDCharacteristic != null) {
+			this.mLockCMDCharacteristic.setValue(byteCmd);
+			writeCharacteristic(this.mLockCMDCharacteristic, byteCmd);
+			this.mLOCKED = on;
+			DebugLogger.d("ProximityManager", "Lock command sent. Locked: "+on);
+			return;
+		}
+		DebugLogger.w("ProximityManager", "Lock command Characteristic is not found");
 	}
 
 	/**

@@ -83,7 +83,7 @@ public class ProximityActivity extends BleMulticonnectProfileServiceReadyActivit
 
 	@Override
 	protected UUID getFilterUUID() {
-		return ProximityManager.LINKLOSS_SERVICE_UUID;
+		return ProximityManager.LOCK_SERVICE;
 	}
 
 	@Override
