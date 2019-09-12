@@ -271,6 +271,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 	@Override
 	public void onDeviceConnected(final BluetoothDevice device) {
 		super.onDeviceConnected(device);
+		httpTools.pushLockState(device.getName().trim() + " is connected");
 
 		if (!mBinded) {
 			createBackgroundNotification();
@@ -295,6 +296,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 		mServerManager.cancelConnection(device);
 		stopAlarm(device);
 		super.onLinklossOccur(device);
+		httpTools.pushLockState(device.getName().trim() + " lost connection");
 
 		if (!mBinded) {
 			createBackgroundNotification();
@@ -320,6 +322,13 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 	@Override
 	public void onAlarmTriggered(final BluetoothDevice device) {
 //		playAlarm(device);
+		httpTools.pushLockState("Alarm triggered for " + device.getName().trim());
+	}
+
+	@Override
+	public void onBatteryValueReceived(BluetoothDevice device, int value) {
+		httpTools.pushLockState("Battery value for " + device.getName().trim() + " is " + value);
+		super.onBatteryValueReceived(device, value);
 	}
 
 	@Override
