@@ -38,6 +38,7 @@ class HttpTools(val mBinder: ProximityService.ProximityBinder) {
     private var lastMessage: Date? = null
     private var watchDog: Runnable
     private var socket: WebSocket? = null
+    private var destroy = false
 
     init {
         val httpLoggingInterceptor = HttpLoggingInterceptor()
@@ -49,6 +50,7 @@ class HttpTools(val mBinder: ProximityService.ProximityBinder) {
 
         watchDog = object: Runnable {
             override fun run() {
+                if (destroy) return
                 Log.d(TAG, "##### watchdog")
                 lastMessage?.time?.let {
                     if (Date().time - it > 1000 * 60) {
@@ -68,6 +70,7 @@ class HttpTools(val mBinder: ProximityService.ProximityBinder) {
     }
 
     private fun setupSocketListener(retry: Int? = null) {
+        if (destroy) return
         lastMessage = null
         var retry = retry
 
@@ -81,7 +84,7 @@ class HttpTools(val mBinder: ProximityService.ProximityBinder) {
                 retry?.let {
                     pushLockState("Socket listener is up again")
                     retry = null
-                }
+                } ?: pushLockState("Socket listener started")
                 Log.d(TAG, "##### onOpen: " + response.body())
             }
 
@@ -97,7 +100,7 @@ class HttpTools(val mBinder: ProximityService.ProximityBinder) {
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        pushLockState("Failed to toggle lock: ${e.message}")
+                        pushLockState("Failed to toggle lock: $e")
                     }
                 }
             }
@@ -121,6 +124,7 @@ class HttpTools(val mBinder: ProximityService.ProximityBinder) {
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 super.onFailure(webSocket, t, response)
+                if (destroy) return
                 Log.d(TAG, "##### Failure")
                 t.printStackTrace()
                 if (retry == 1) {
@@ -178,5 +182,11 @@ class HttpTools(val mBinder: ProximityService.ProximityBinder) {
                 }
             })
         }
+    }
+
+    fun destroy() {
+        pushLockState("Service was stopped")
+        destroy = true
+        socket?.cancel()
     }
 }

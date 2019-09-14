@@ -175,7 +175,7 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 
 				if (BleLockCodes.isNewLockState(lockstatusValue)) {
 					boolean locked = BleLockCodes.isDoorLocked(lockstatusValue);
-					httpTools.pushLockState("Lock "+gatt.getDevice().getName().trim()+" is "+(locked ? "Locked" : "Unlocked"));
+					httpTools.pushLockState(gatt.getDevice().getName().trim()+" is "+(locked ? "Locked" : "Unlocked"));
 				} else if (BleLockCodes.isFailedLockState(lockstatusValue)) {
 					httpTools.pushLockState(gatt.getDevice().getName().trim()+" failed to lock");
 				}
@@ -221,7 +221,7 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 	 */
 	public void writeImmediateAlert(final boolean on) {
 		if (!isConnected()) {
-			httpTools.pushLockState("Lock "+mBluetoothDevice.getName().trim()+" is not connected");
+			httpTools.pushLockState(mBluetoothDevice.getName().trim()+" is not connected");
 			return;
 		}
 

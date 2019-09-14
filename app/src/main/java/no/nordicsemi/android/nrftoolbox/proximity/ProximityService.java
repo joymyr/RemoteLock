@@ -214,6 +214,8 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 		unregisterReceiver(mDisconnectActionBroadcastReceiver);
 		unregisterReceiver(mToggleAlarmActionBroadcastReceiver);
 
+		httpTools.destroy();
+
 		super.onServiceStopped();
 	}
 
