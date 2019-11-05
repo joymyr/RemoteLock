@@ -13,11 +13,11 @@ Modified to remote control Secuyou Bluetooth locks over PushBullet
 To make a request from another system:
 * Call url: "https://api.pushbullet.com/v2/ephemerals"
 * Headers:
-** "Access-Token": "You access token"
-** "Content-Type": "application/json"
+  * "Access-Token": "Your access token"
+  * "Content-Type": "application/json"
 * Body
-** "{\"push\":{\"doorlock\":\"unlock\"},\"type\":\"push\"}" (to unlock the door)
-** "{\"doorlock\":\"lock\"},\"type\":\"push\"}" (to lock the door)
+  * "{\"push\":{\"doorlock\":\"unlock\"},\"type\":\"push\"}" (to unlock the door)
+  * "{\"doorlock\":\"lock\"},\"type\":\"push\"}" (to lock the door)
 
 I have successfully used this with the Android-app "HTTP Request shortcuts".
 
