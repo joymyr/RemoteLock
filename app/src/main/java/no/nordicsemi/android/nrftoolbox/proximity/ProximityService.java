@@ -44,6 +44,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -99,10 +100,39 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 			return manager.toggleImmediateAlert();
 		}
 
-		public void toggleLock(BluetoothDevice device, boolean locked) {
+		public boolean toggleLock(BluetoothDevice device, boolean locked) {
 			DebugLogger.d(TAG, "Toggle lock. Set locked: "+locked);
 			final ProximityManager manager = (ProximityManager) getBleManager(device);
-			manager.writeImmediateAlert(locked);
+			return manager.writeImmediateAlert(locked);
+		}
+
+		public boolean isLocked(BluetoothDevice device) {
+			final ProximityManager manager = (ProximityManager) getBleManager(device);
+			return manager.isAlertEnabled();
+		}
+
+		public int getBattery(BluetoothDevice device) {
+			final ProximityManager manager = (ProximityManager) getBleManager(device);
+			return manager.getBatteryValue();
+		}
+
+		ArrayList<BluetoothDevice> disconnectedDevices = new ArrayList<>();
+
+		public boolean toggleConnection(BluetoothDevice device, boolean connect) {
+			final ProximityManager manager = (ProximityManager) getBleManager(device);
+			DebugLogger.d(TAG, "Toggle connection. Connect: "+connect);
+			if (connect) {
+				for (BluetoothDevice bl : BluetoothAdapter.getDefaultAdapter().getBondedDevices()) {
+					if (device.getAddress().equals(bl.getAddress())) {
+						getBinder().connect(bl, null);
+					}
+				}
+				disconnectedDevices.remove(device);
+			} else {
+				disconnectedDevices.add(device);
+				manager.disconnect();
+			}
+			return isConnected(device);
 		}
 
 		/**

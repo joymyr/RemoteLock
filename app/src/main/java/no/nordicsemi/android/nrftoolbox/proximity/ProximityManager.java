@@ -64,7 +64,6 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 	private final HttpTools httpTools;
 
 	private BluetoothGattCharacteristic mAlertLevelCharacteristic, mLinklossCharacteristic;
-	private boolean mAlertOn;
 
 	public ProximityManager(final Context context, HttpTools httpTools) {
 		super(context);
@@ -144,7 +143,7 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 			mAlertLevelCharacteristic = null;
 			mLinklossCharacteristic = null;
 			// Reset the alert flag
-			mAlertOn = false;
+			mIsLocked = false;
 		}
 
 		@Override
@@ -164,6 +163,8 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 			onCharacteristicIndicated(gatt, characteristic);
 		}
 
+		int lockRetryCount = 0;
+
 		@Override
 		protected void onCharacteristicIndicated(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
 			super.onCharacteristicIndicated(gatt, characteristic);
@@ -174,10 +175,17 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 				Logger.a(mLogSession, "Lockstatus received: " + lockstatusValue + "%");
 
 				if (BleLockCodes.isNewLockState(lockstatusValue)) {
-					boolean locked = BleLockCodes.isDoorLocked(lockstatusValue);
-					httpTools.pushLockState(gatt.getDevice().getName().trim()+" is "+(locked ? "Locked" : "Unlocked"));
+					mIsLocked = BleLockCodes.isDoorLocked(lockstatusValue);
+					httpTools.pushLockState(gatt.getDevice().getName().trim()+" is "+(mIsLocked ? "Locked" : "Unlocked"));
+					lockRetryCount = 0;
 				} else if (BleLockCodes.isFailedLockState(lockstatusValue)) {
-					httpTools.pushLockState(gatt.getDevice().getName().trim()+" failed to lock");
+					httpTools.pushLockState(gatt.getDevice().getName().trim()+" failed to "+(mNewLockState ? "lock" : "unlock"));
+					if (lockRetryCount < 3) {
+						lockRetryCount++;
+						writeImmediateAlert(mNewLockState);
+					} else {
+						lockRetryCount = 0;
+					}
 				}
 			} else if (isBatteryLevelCharacteristic(characteristic)) {
 				Logger.a(mLogSession, "Notification received from " + characteristic.getUuid() + ", value: " + data);
@@ -188,7 +196,8 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 		}
 	};
 
-	private boolean mLOCKED;
+	private boolean mIsLocked;
+	private boolean mNewLockState;
 	private BluetoothGattCharacteristic mLockCMDCharacteristic;
 	private BluetoothGattCharacteristic mLockCharacteristic;
 
@@ -211,18 +220,17 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 	 * @return true if alarm has been enabled, false if disabled
 	 */
 	public boolean toggleImmediateAlert() {
-		writeImmediateAlert(!mAlertOn);
-		return mAlertOn;
+		return writeImmediateAlert(!mIsLocked);
 	}
 
 	/**
 	 * Writes the HIGH ALERT or NO ALERT command to the target device
 	 * @param on true to enable the alarm on proximity tag, false to disable it
 	 */
-	public void writeImmediateAlert(final boolean on) {
+	public boolean writeImmediateAlert(final boolean on) {
 		if (!isConnected()) {
 			httpTools.pushLockState(mBluetoothDevice.getName().trim()+" is not connected");
-			return;
+			return mIsLocked;
 		}
 
 		byte[] byteCmd = on ? LOCK : UNLOCK;
@@ -230,17 +238,19 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 		if (this.mLockCMDCharacteristic != null) {
 			this.mLockCMDCharacteristic.setValue(byteCmd);
 			writeCharacteristic(this.mLockCMDCharacteristic, byteCmd);
-			this.mLOCKED = on;
+			this.mNewLockState = on;
 			DebugLogger.d("ProximityManager", "Lock command sent. Locked: "+on);
-			return;
+			return mNewLockState;
+		} else {
+			DebugLogger.w("ProximityManager", "Lock command Characteristic is not found");
+			return mIsLocked;
 		}
-		DebugLogger.w("ProximityManager", "Lock command Characteristic is not found");
 	}
 
 	/**
 	 * Returns true if the alert has been enabled on the proximity tag, false otherwise.
 	 */
 	public boolean isAlertEnabled() {
-		return mAlertOn;
+		return mIsLocked;
 	}
 }

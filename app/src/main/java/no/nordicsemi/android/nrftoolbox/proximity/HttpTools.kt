@@ -95,8 +95,16 @@ class HttpTools(val mBinder: ProximityService.ProximityBinder) {
                 val state = JsonParser().parse(text).asJsonObject.getAsJsonObject("push")?.getAsJsonPrimitive("doorlock")
                 state?.let {
                     try {
-                        for (device in mBinder.managedDevices) {
-                            mBinder.toggleLock(device, it.asString == "lock")
+                        for (device in listOf(mBinder.managedDevices, mBinder.disconnectedDevices).flatten()) {
+                            when(it.asString) {
+                                "lock" -> mBinder.toggleLock(device, true)
+                                "unlock" -> mBinder.toggleLock(device, false)
+                                "status" -> pushLockState("Door is ${if (mBinder.isLocked(device)) "locked" else "unlocked"}")
+                                "battery" -> pushLockState("Door battery value is ${mBinder.getBattery(device)}")
+                                "connect" -> mBinder.toggleConnection(device, true);
+                                "disconnect" -> mBinder.toggleConnection(device, false);
+                                else -> Log.d(TAG, "Unknown lock command")
+                            }
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()

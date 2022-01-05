@@ -96,25 +96,28 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.ViewHolder
 
 		public ViewHolder(final View itemView) {
 			super(itemView);
-
 			nameView = itemView.findViewById(R.id.name);
 			addressView = itemView.findViewById(R.id.address);
 			batteryView = itemView.findViewById(R.id.battery);
 			actionButton = itemView.findViewById(R.id.action_find_silent);
 
+			int position = getAdapterPosition();
+			if (position != -1) {
+				final BluetoothDevice device = mDevices.get(position);
+				final boolean locked = mService.isLocked(device);
+				actionButton.setImageResource(locked ? R.drawable.ic_lock_locked : R.drawable.ic_lock_open_black_24dp);
+			}
+
 			// Configure FIND / SILENT button
 			actionButton.setOnClickListener(v -> {
-				final int position = getAdapterPosition();
-				final BluetoothDevice device = mDevices.get(position);
-				final boolean on = mService.toggleImmediateAlert(device);
-
-				actionButton.setImageResource(on ? R.drawable.ic_stat_notify_proximity_silent : R.drawable.ic_stat_notify_proximity_find);
+				BluetoothDevice device = mDevices.get(getAdapterPosition());
+				final boolean newLockState = mService.toggleImmediateAlert(device);
+				actionButton.setImageResource(newLockState ? R.drawable.ic_lock_locked : R.drawable.ic_lock_open_black_24dp);
 			});
 
 			// Configure Disconnect button
 			itemView.findViewById(R.id.action_disconnect).setOnClickListener(v -> {
-				final int position = getAdapterPosition();
-				final BluetoothDevice device = mDevices.get(position);
+				BluetoothDevice device = mDevices.get(getAdapterPosition());
 				mService.disconnect(device);
 				// The device might have not been connected, so there will be no callback
 				onDeviceRemoved(device);
@@ -130,8 +133,6 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.ViewHolder
 			nameView.setText(name);
 			addressView.setText(device.getAddress());
 
-			final boolean on = mService.isImmediateAlertOn(device);
-			actionButton.setImageResource(on ? R.drawable.ic_stat_notify_proximity_silent : R.drawable.ic_stat_notify_proximity_find);
 			actionButton.setVisibility(state == BluetoothGatt.STATE_CONNECTED ? View.VISIBLE : View.GONE);
 
 			final int batteryValue = mService.getBatteryValue(device);
@@ -143,6 +144,8 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.ViewHolder
 			} else {
 				batteryView.setVisibility(View.GONE);
 			}
+
+			mService.toggleLock(device, true);
 		}
 	}
 }
