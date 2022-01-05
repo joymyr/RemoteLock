@@ -54,6 +54,7 @@ import no.nordicsemi.android.log.LogContract;
 import no.nordicsemi.android.nrftoolbox.R;
 import no.nordicsemi.android.nrftoolbox.ToolboxApplication;
 import no.nordicsemi.android.nrftoolbox.profile.multiconnect.BleMulticonnectProfileService;
+import no.nordicsemi.android.nrftoolbox.proximity.remote.RemoteClient;
 import no.nordicsemi.android.nrftoolbox.utility.DebugLogger;
 
 public class ProximityService extends BleMulticonnectProfileService implements ProximityManagerCallbacks, ProximityServerManagerCallbacks {
@@ -84,7 +85,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 
 	private int mAttempt;
 	private final static int MAX_ATTEMPTS = 1;
-	private HttpTools httpTools;
+	private RemoteClient remoteClient;
 
 	/**
 	 * This local binder is an interface for the bonded activity to operate with the proximity sensor
@@ -116,7 +117,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 			return manager.getBatteryValue();
 		}
 
-		ArrayList<BluetoothDevice> disconnectedDevices = new ArrayList<>();
+		public ArrayList<BluetoothDevice> disconnectedDevices = new ArrayList<>();
 
 		public boolean toggleConnection(BluetoothDevice device, boolean connect) {
 			final ProximityManager manager = (ProximityManager) getBleManager(device);
@@ -154,7 +155,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 
 	@Override
 	protected BleManager<ProximityManagerCallbacks> initializeManager() {
-		return new ProximityManager(this, httpTools);
+		return new ProximityManager(this, remoteClient);
 	}
 
 	/**
@@ -207,8 +208,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 		filter.addAction(ACTION_SILENT);
 		registerReceiver(mToggleAlarmActionBroadcastReceiver, filter);
 
-		httpTools = new HttpTools(mBinder);
-		httpTools.initSocketListener();
+		remoteClient = new RemoteClient(mBinder, getBaseContext());
 	}
 
 	private void startForeground(){
@@ -244,7 +244,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 		unregisterReceiver(mDisconnectActionBroadcastReceiver);
 		unregisterReceiver(mToggleAlarmActionBroadcastReceiver);
 
-		httpTools.destroy();
+		remoteClient.destroy();
 
 		super.onServiceStopped();
 	}
@@ -303,7 +303,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 	@Override
 	public void onDeviceConnected(final BluetoothDevice device) {
 		super.onDeviceConnected(device);
-		httpTools.pushLockState(device.getName().trim() + " is connected");
+		remoteClient.onInfo(device.getName().trim() + " is connected");
 
 		if (!mBinded) {
 			createBackgroundNotification();
@@ -313,7 +313,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 	@Override
 	public void onError(BluetoothDevice device, String message, int errorCode) {
 		super.onError(device, message, errorCode);
-		httpTools.pushLockState("Error code "+errorCode+" occured: "+message);
+		remoteClient.onError("Error code "+errorCode+" occured: "+message);
 		Log.d(TAG, "Error code "+errorCode+" occured: "+message);
 	}
 
@@ -328,7 +328,7 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 		mServerManager.cancelConnection(device);
 		stopAlarm(device);
 		super.onLinklossOccur(device);
-		httpTools.pushLockState(device.getName().trim() + " lost connection");
+		remoteClient.onError(device.getName().trim() + " lost connection");
 
 		if (!mBinded) {
 			createBackgroundNotification();
@@ -354,12 +354,12 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 	@Override
 	public void onAlarmTriggered(final BluetoothDevice device) {
 //		playAlarm(device);
-		httpTools.pushLockState("Alarm triggered for " + device.getName().trim());
+		remoteClient.onError("Alarm triggered for " + device.getName().trim());
 	}
 
 	@Override
 	public void onBatteryValueReceived(BluetoothDevice device, int value) {
-		httpTools.pushLockState("Battery value for " + device.getName().trim() + " is " + value);
+		remoteClient.onInfo("Battery value for " + device.getName().trim() + " is " + value);
 		super.onBatteryValueReceived(device, value);
 	}
 

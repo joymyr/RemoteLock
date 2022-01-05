@@ -1,3 +1,6 @@
+def localProperties = new Properties()
+localProperties.load(new FileInputStream(rootProject.file("local.properties")))
+
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android-extensions'
 apply plugin: 'kotlin-android'
@@ -13,6 +16,7 @@ android {
         versionName "2.6.0"
         resConfigs "en"
     }
+
     buildTypes {
         debug {
             minifyEnabled true
@@ -21,6 +25,13 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        all {
+            resValue("string", "pushbullet_key", localProperties['pushbulletKey'])
+            resValue("string", "mqtt_uri", localProperties['mqttUri'])
+            resValue("string", "mqtt_username", localProperties['mqttUsername'])
+            resValue("string", "mqtt_password", localProperties['mqttPassword'])
+            resValue("string", "mqtt_lock_topic", localProperties['mqttLockTopic'])
         }
     }
     compileOptions {
@@ -62,6 +73,9 @@ dependencies {
     }
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.0.1'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.6.0-RC2"
+
+    implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.1.0'
+    implementation 'org.eclipse.paho:org.eclipse.paho.android.service:1.1.1'
 }
 // temporary workaround for support library version mismatch
 configurations.all {

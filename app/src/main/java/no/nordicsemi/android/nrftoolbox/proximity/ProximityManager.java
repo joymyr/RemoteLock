@@ -34,6 +34,7 @@ import no.nordicsemi.android.ble.BleManager;
 import no.nordicsemi.android.ble.Request;
 import no.nordicsemi.android.log.Logger;
 import no.nordicsemi.android.nrftoolbox.parser.AlertLevelParser;
+import no.nordicsemi.android.nrftoolbox.proximity.remote.RemoteClient;
 import no.nordicsemi.android.nrftoolbox.utility.DebugLogger;
 import no.nordicsemi.android.nrftoolbox.utility.ParserUtils;
 
@@ -61,13 +62,13 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 	private final static byte[] HIGH_ALERT = { 0x02 };
 	private final static byte[] MILD_ALERT = { 0x01 };
 	private final static byte[] NO_ALERT = { 0x00 };
-	private final HttpTools httpTools;
+	private final RemoteClient remoteClient;
 
 	private BluetoothGattCharacteristic mAlertLevelCharacteristic, mLinklossCharacteristic;
 
-	public ProximityManager(final Context context, HttpTools httpTools) {
+	public ProximityManager(final Context context, RemoteClient remoteClient) {
 		super(context);
-		this.httpTools = httpTools;
+		this.remoteClient = remoteClient;
 	}
 
 	@Override
@@ -176,10 +177,10 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 
 				if (BleLockCodes.isNewLockState(lockstatusValue)) {
 					mIsLocked = BleLockCodes.isDoorLocked(lockstatusValue);
-					httpTools.pushLockState(gatt.getDevice().getName().trim()+" is "+(mIsLocked ? "Locked" : "Unlocked"));
+					remoteClient.onLockStateChanged(gatt.getDevice().getName().trim(), mIsLocked);
 					lockRetryCount = 0;
 				} else if (BleLockCodes.isFailedLockState(lockstatusValue)) {
-					httpTools.pushLockState(gatt.getDevice().getName().trim()+" failed to "+(mNewLockState ? "lock" : "unlock"));
+					remoteClient.onError(gatt.getDevice().getName().trim()+" failed to "+(mNewLockState ? "lock" : "unlock"));
 					if (lockRetryCount < 3) {
 						lockRetryCount++;
 						writeImmediateAlert(mNewLockState);
@@ -191,7 +192,7 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 				Logger.a(mLogSession, "Notification received from " + characteristic.getUuid() + ", value: " + data);
 				int batteryValue = characteristic.getIntValue(17, 0);
 				Logger.a(mLogSession, "Battery level received: " + batteryValue + "%");
-				httpTools.pushLockState("Battery level of "+gatt.getDevice().getName()+" is "+batteryValue);
+				remoteClient.onInfo("Battery level of "+gatt.getDevice().getName()+" is "+batteryValue);
 			}
 		}
 	};
@@ -229,7 +230,7 @@ public class ProximityManager extends BleManager<ProximityManagerCallbacks> {
 	 */
 	public boolean writeImmediateAlert(final boolean on) {
 		if (!isConnected()) {
-			httpTools.pushLockState(mBluetoothDevice.getName().trim()+" is not connected");
+			remoteClient.onError(mBluetoothDevice.getName().trim()+" is not connected");
 			return mIsLocked;
 		}
 

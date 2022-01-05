@@ -1,13 +1,15 @@
-package no.nordicsemi.android.nrftoolbox.proximity
+package no.nordicsemi.android.nrftoolbox.proximity.remote
 
+import android.content.Context
 import android.os.Handler
-import android.os.Looper
 import android.text.format.DateFormat
 import android.util.Log
 import com.google.gson.JsonParser
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import no.nordicsemi.android.nrftoolbox.proximity.ProximityService
+import no.nordicsemi.android.nrftoolbox.R
 
 import org.json.JSONException
 import org.json.JSONObject
@@ -27,11 +29,14 @@ import okhttp3.logging.HttpLoggingInterceptor
 import okio.ByteString
 import java.util.*
 
-class HttpTools(val mBinder: ProximityService.ProximityBinder) {
+class PushbulletClient(
+    val mBinder: ProximityService.ProximityBinder,
+    val context: Context
+) {
 
     companion object {
         private val MEDIATYPE_JSON = MediaType.parse("application/json; charset=utf-8")
-        private const val TAG = "HttpTools"
+        private const val TAG = "PushbulletClient"
     }
 
     private var okHttpClient: OkHttpClient
@@ -75,7 +80,7 @@ class HttpTools(val mBinder: ProximityService.ProximityBinder) {
         var retry = retry
 
         val request = okhttp3.Request.Builder()
-                .url("wss://stream.pushbullet.com/websocket/$PUSHBULLET_KEY").build()
+                .url("wss://stream.pushbullet.com/websocket/${context.resources.getString(R.string.pushbullet_key)}").build()
 
         val pushBulletListener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -167,7 +172,7 @@ class HttpTools(val mBinder: ProximityService.ProximityBinder) {
         val body = RequestBody.create(MEDIATYPE_JSON, jsonObject.toString())
         val respRequest = okhttp3.Request.Builder()
                 .url("https://api.pushbullet.com/v2/pushes")
-                .addHeader("Access-Token", PUSHBULLET_KEY)
+                .addHeader("Access-Token", context.resources.getString(R.string.pushbullet_key))
                 .post(body)
                 .build()
         GlobalScope.launch {
@@ -196,5 +201,17 @@ class HttpTools(val mBinder: ProximityService.ProximityBinder) {
         pushLockState("Service was stopped")
         destroy = true
         socket?.cancel()
+    }
+
+    fun onLockStateChanged(id: String, locked: Boolean) {
+        pushLockState("$id is ${if (locked) "Locked" else "Unlocked"}")
+    }
+
+    fun onInfo(message: String) {
+        pushLockState(message)
+    }
+
+    fun onError(message: String) {
+        pushLockState(message)
     }
 }
