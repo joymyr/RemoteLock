@@ -192,6 +192,8 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 
 	@Override
 	protected void onServiceCreated() {
+		remoteClient = new RemoteClient(mBinder, getBaseContext());
+
 		Intent notificationIntent = new Intent(this, ProximityActivity.class);
 		PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
 
@@ -207,8 +209,6 @@ public class ProximityService extends BleMulticonnectProfileService implements P
 		filter.addAction(ACTION_FIND);
 		filter.addAction(ACTION_SILENT);
 		registerReceiver(mToggleAlarmActionBroadcastReceiver, filter);
-
-		remoteClient = new RemoteClient(mBinder, getBaseContext());
 	}
 
 	private void startForeground(){

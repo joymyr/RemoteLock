@@ -8,7 +8,7 @@ import no.nordicsemi.android.nrftoolbox.proximity.ProximityService
 import org.eclipse.paho.android.service.MqttAndroidClient
 import org.eclipse.paho.client.mqttv3.*
 
-class MqttClient(private val context: Context, mBinder: ProximityService.ProximityBinder) {
+class MqttClient(context: Context, mBinder: ProximityService.ProximityBinder) {
     var mqttUri = context.resources.getString(R.string.mqtt_uri)
     var mqttLockCommandTopic = context.resources.getString(R.string.mqtt_lock_cmd_topic)
     var mqttLockEventTopic = context.resources.getString(R.string.mqtt_lock_evt_topic)
@@ -16,11 +16,9 @@ class MqttClient(private val context: Context, mBinder: ProximityService.Proximi
     var mqttUsername = context.resources.getString(R.string.mqtt_username)
     var mqttPassword = context.resources.getString(R.string.mqtt_password)
 
-    private val client by lazy {
-        val clientId = "AndroidRaspberryPi"
-        MqttAndroidClient(context, mqttUri,
-            clientId)
-    }
+    private val client = MqttAndroidClient(context, mqttUri, "AndroidRaspberryPi")
+
+    private var unpublished: ArrayList<Pair<String, String>> = arrayListOf()
 
     companion object {
         const val TAG = "MqttClient"
@@ -48,6 +46,10 @@ class MqttClient(private val context: Context, mBinder: ProximityService.Proximi
             options.password = mqttPassword.toCharArray()
             client.setCallback(object : MqttCallbackExtended {
                 override fun connectComplete(reconnect: Boolean, serverURI: String) {
+                    unpublished.forEach {
+                        publishMessage(it.first, it.second);
+                    }
+                    unpublished.clear()
                     topics?.forEach {
                         subscribeTopic(it)
                     }
@@ -134,7 +136,10 @@ class MqttClient(private val context: Context, mBinder: ProximityService.Proximi
         try {
             val message = MqttMessage()
             message.payload = msg.toByteArray()
-            client.publish(topic, message.payload, 0, true)
+            if(client.isConnected)
+                client.publish(topic, message.payload, 0, true)
+            else
+                unpublished.add(Pair(topic, msg))
             Log.d(TAG, "$msg published to $topic")
         } catch (e: MqttException) {
             Log.d(TAG, "Error Publishing to $topic: " + e.message)
