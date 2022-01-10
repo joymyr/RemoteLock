@@ -31,7 +31,9 @@ android {
             resValue("string", "mqtt_uri", localProperties['mqttUri'])
             resValue("string", "mqtt_username", localProperties['mqttUsername'])
             resValue("string", "mqtt_password", localProperties['mqttPassword'])
-            resValue("string", "mqtt_lock_topic", localProperties['mqttLockTopic'])
+            resValue("string", "mqtt_lock_cmd_topic", localProperties['mqttLockCmdTopic'])
+            resValue("string", "mqtt_lock_evt_topic", localProperties['mqttLockEvtTopic'])
+            resValue("string", "mqtt_alarm_evt_topic", localProperties['mqttAlarmEvtTopic'])
         }
     }
     compileOptions {

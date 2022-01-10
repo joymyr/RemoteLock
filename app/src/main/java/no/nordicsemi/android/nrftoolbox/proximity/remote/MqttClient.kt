@@ -10,7 +10,9 @@ import org.eclipse.paho.client.mqttv3.*
 
 class MqttClient(private val context: Context, mBinder: ProximityService.ProximityBinder) {
     var mqttUri = context.resources.getString(R.string.mqtt_uri)
-    var mqttLockTopic = context.resources.getString(R.string.mqtt_lock_topic)
+    var mqttLockCommandTopic = context.resources.getString(R.string.mqtt_lock_cmd_topic)
+    var mqttLockEventTopic = context.resources.getString(R.string.mqtt_lock_evt_topic)
+    var mqttAlarmEvtTopic = context.resources.getString(R.string.mqtt_alarm_evt_topic)
     var mqttUsername = context.resources.getString(R.string.mqtt_username)
     var mqttPassword = context.resources.getString(R.string.mqtt_password)
 
@@ -25,9 +27,7 @@ class MqttClient(private val context: Context, mBinder: ProximityService.Proximi
     }
 
     init {
-        connect(topics = arrayOf(mqttLockTopic), messageCallBack = { topic, message ->
-            val src = JsonParser().parse(message.toString()).asJsonObject["src"].asString
-            if (src == "lock") return@connect
+        connect(topics = arrayOf(mqttLockCommandTopic), messageCallBack = { topic, message ->
             val locked = JsonParser().parse(message.toString()).asJsonObject["val"].asBoolean
             Log.d(TAG, "MQTT Set lock status: $locked")
             try {
@@ -90,21 +90,44 @@ class MqttClient(private val context: Context, mBinder: ProximityService.Proximi
 
     fun onLockStateChanged(locked: Boolean) {
         publishMessage(
-            mqttLockTopic, """{
+            mqttLockEventTopic, """{
                 "serv": "door_lock",
-                "type": "cmd.lock.set",
-                "val_t": "bool",
-                "val": $locked,
+                "type": "evt.lock.report",
+                "val_t": "bool_map",
+                "val": {
+                    "door_is_closed": true,
+                    "is_secured": $locked
+                },
                 "src": "lock"
             }""")
     }
 
     fun onInfo(message: String) {
-        Log.w(TAG,"onInfo not implemented") // TODO: Implement
+        publishMessage(
+            mqttAlarmEvtTopic, """{
+            "serv": "alarm_lock",
+            "type": "evt.alarm.report",
+            "val_t": "str_map",
+            "val": {
+                "event": "$message",
+                "status": "activ"
+            },
+            "src": "lock"
+        }""") // TODO: Send correct events
     }
 
     fun onError(message: String) {
-        Log.e(TAG,"onError not implemented") // TODO: Implement
+        publishMessage(
+            mqttAlarmEvtTopic, """{
+            "serv": "alarm_lock",
+            "type": "evt.alarm.report",
+            "val_t": "str_map",
+            "val": {
+                "event": "$message",
+                "status": "activ"
+            },
+            "src": "lock"
+        }""") // TODO: Send correct events
     }
 
     private fun publishMessage(topic: String, msg: String) {

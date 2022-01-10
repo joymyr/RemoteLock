@@ -11,7 +11,9 @@ Modified to remote control Secuyou Bluetooth locks over PushBullet, using a spar
   mqttUri="tcp://xxx.xxx.x.xxx:1884"
   mqttUsername="<mqtt username>"
   mqttPassword="<mqtt password>"
-  mqttLockTopic="<Topic for the door lock>"
+  mqttLockCmdTopic="<Topic for recieving the door lock command>"
+  mqttLockEvtTopic="<Topic for sending door lock events>"
+  mqttAlarmEvtTopic="<Topic for sending door lock errors and messages>"
   ```
 * Install Android on a Raspberry PI or find a spare Android phone that you can leave within reach of your lock, and always connected to power
 * Pair the device with your Secuyou lock from bluetooth settings
@@ -34,21 +36,37 @@ To integrate with another system using MQTT (Tested with Futurehome):
 * Post to topic:
 ```
 {
-"serv": "door_lock",
-"type": "cmd.lock.set",
-"val_t": "bool",
-"val": <true or false>,
-"src": "<anything other than lock>"
+  "serv": "door_lock",
+  "type": "cmd.lock.set",
+  "val_t": "bool",
+  "val": <true or false>,
+  "src": "<anything other than lock>"
 }
 ```
-* Handle MQTT messages sent to topic in this format:
+* Handle MQTT messages sent to event topic in this format:
 ```
 {
-"serv": "door_lock",
-"type": "cmd.lock.set",
-"val_t": "bool",
-"val": <true or false>,
-"src": "lock"
+    "serv": "door_lock",
+    "type": "evt.lock.report",
+    "val_t": "bool_map",
+    "val": {
+        "door_is_closed": true,
+        "is_secured": <true or false>
+    },
+    "src": "lock"
+}
+```
+* Optionally handle MQTT messages sent to alarm event topic in this format:
+```
+{
+    "serv": "alarm_lock",
+    "type": "evt.alarm.report",
+    "val_t": "str_map",
+    "val": {
+        "event": "<message>",
+        "status": "activ"
+    },
+    "src": "lock"
 }
 ```
 
