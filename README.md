@@ -1,6 +1,9 @@
 # Remote Lock
 
+Update: I made another project to support the newest lock version: https://github.com/joymyr/secuyou_remote
+
 Update: Support lock/unlock over MQTT, see how to configure in Futurehome: https://forum.futurehome.io/t/virtuell-dorlas/2546/3
+
 Based on [Android-nRF-Toolbox](https://github.com/NordicSemiconductor/Android-nRF-Toolbox)
 Modified to remote control Secuyou Bluetooth locks over PushBullet, using a spare Android phone or a Raspberry PI
 Tested on lock that works with the app "Secuyou Lock app". 
